@@ -11482,72 +11482,84 @@ def build_html(embed_base64: bool = False, crest_data_uri: str = "") -> str:
 
 
 def main():
-    BASE_DIR.mkdir(parents=True, exist_ok=True)
-    target_script = BASE_DIR / "build_acos_cinematic.py"
-    if Path(__file__).resolve() != target_script.resolve():
-        shutil.copy2(__file__, target_script)
     crest_uri = extract_transparent_oval_crest()
     print(f"[OK] Stemma Ovale Ufficiale A.C.O.S. estratto e scontornato ({len(crest_uri)} bytes data URI)")
 
     html_live = build_html(embed_base64=False, crest_data_uri=crest_uri)
-    INDEX_OUT.write_text(html_live, encoding="utf-8")
-    print(f"[OK] Generato {INDEX_OUT} ({INDEX_OUT.stat().st_size / 1024:.1f} KB)")
-
     html_sim = build_html(embed_base64=True, crest_data_uri=crest_uri)
-    SIM_OUT.write_text(html_sim, encoding="utf-8")
     (Path(__file__).resolve().parent / "header_preview.html").write_text(html_sim, encoding="utf-8")
-    print(f"[OK] Generato {SIM_OUT} ({SIM_OUT.stat().st_size / (1024*1024):.2f} MB — Standalone Base64)")
 
-    public_dir = BASE_DIR.parent / "app" / "public"
-    if public_dir.exists() and BASE_DIR.parent.name in ("calcio", "acos"):
-        acos_pub = public_dir / "acos"
-        acos_pub_assets = acos_pub / "assets"
-        acos_pub_assets.mkdir(parents=True, exist_ok=True)
-        for img_f in ASSETS_DIR.glob("*.*"):
-            if img_f.suffix.lower() in (".jpg", ".png"):
-                shutil.copy2(img_f, acos_pub_assets / img_f.name)
-        (acos_pub / "index.html").write_text(html_live, encoding="utf-8")
-        html_wp = (
-            html_live.replace('"assets/', '"/acos/assets/')
-            .replace("'assets/", "'/acos/assets/")
-        )
-        mu_dir = public_dir / "wp-content" / "mu-plugins"
-        mu_dir.mkdir(parents=True, exist_ok=True)
-        mu_tpl = mu_dir / "acos-cinematic-template.html"
-        mu_tpl.write_text(html_wp, encoding="utf-8")
-        print(f"[OK] Sincronizzato con Local.app in {mu_tpl}")
+    try:
+        BASE_DIR.mkdir(parents=True, exist_ok=True)
+        target_script = BASE_DIR / "build_acos_cinematic.py"
+        if Path(__file__).resolve() != target_script.resolve():
+            shutil.copy2(__file__, target_script)
 
-    candidate_repos = [
-        BASE_DIR / "gh-pages",
-        Path(__file__).resolve().parent / "acos-gh-pages",
-    ]
-    for gh_repo_dir in candidate_repos:
-        if (gh_repo_dir / ".git").exists():
-            (gh_repo_dir / "index.html").write_text(html_sim, encoding="utf-8")
-            shutil.copy2(__file__, gh_repo_dir / "build_acos_cinematic.py")
-            status_proc = subprocess.run(
-                ["git", "-C", str(gh_repo_dir), "status", "--porcelain"],
-                capture_output=True,
-                text=True,
+        INDEX_OUT.write_text(html_live, encoding="utf-8")
+        print(f"[OK] Generato {INDEX_OUT} ({INDEX_OUT.stat().st_size / 1024:.1f} KB)")
+
+        SIM_OUT.write_text(html_sim, encoding="utf-8")
+        print(f"[OK] Generato {SIM_OUT} ({SIM_OUT.stat().st_size / (1024*1024):.2f} MB — Standalone Base64)")
+
+        public_dir = BASE_DIR.parent / "app" / "public"
+        if public_dir.exists() and BASE_DIR.parent.name in ("calcio", "acos"):
+            acos_pub = public_dir / "acos"
+            acos_pub_assets = acos_pub / "assets"
+            acos_pub_assets.mkdir(parents=True, exist_ok=True)
+            for img_f in ASSETS_DIR.glob("*.*"):
+                if img_f.suffix.lower() in (".jpg", ".png"):
+                    shutil.copy2(img_f, acos_pub_assets / img_f.name)
+            (acos_pub / "index.html").write_text(html_live, encoding="utf-8")
+            html_wp = (
+                html_live.replace('"assets/', '"/acos/assets/')
+                .replace("'assets/", "'/acos/assets/")
             )
-            if status_proc.stdout.strip():
-                subprocess.run(["git", "-C", str(gh_repo_dir), "add", "index.html", "build_acos_cinematic.py"], check=False)
-                subprocess.run(
-                    ["git", "-C", str(gh_repo_dir), "commit", "-m", "Aggiornamento portale A.C.O.S. Treviglio Calcio 1971"],
-                    check=False,
-                )
-                push_proc = subprocess.run(
-                    ["git", "-C", str(gh_repo_dir), "push", "origin", "main"],
+            mu_dir = public_dir / "wp-content" / "mu-plugins"
+            mu_dir.mkdir(parents=True, exist_ok=True)
+            mu_tpl = mu_dir / "acos-cinematic-template.html"
+            mu_tpl.write_text(html_wp, encoding="utf-8")
+            print(f"[OK] Sincronizzato con Local.app in {mu_tpl}")
+    except PermissionError:
+        print(f"[INFO] Scrittura diretta in {BASE_DIR} richiede permessi fuori sandbox; aggiornati i file nel workspace attivo.")
+
+    candidate_repos = []
+    for candidate in (BASE_DIR / "gh-pages", Path(__file__).resolve().parent / "acos-gh-pages", Path(__file__).resolve().parent / "gh-pages"):
+        if candidate not in candidate_repos:
+            candidate_repos.append(candidate)
+
+    for gh_repo_dir in candidate_repos:
+        try:
+            if (gh_repo_dir / ".git").exists():
+                (gh_repo_dir / "index.html").write_text(html_sim, encoding="utf-8")
+                shutil.copy2(__file__, gh_repo_dir / "build_acos_cinematic.py")
+                for doc_name in ("AGENTS.md", "GEMINI.md", "acos-cli.py"):
+                    doc_src = BASE_DIR.parent / doc_name
+                    if doc_src.exists():
+                        shutil.copy2(doc_src, gh_repo_dir / doc_name)
+                status_proc = subprocess.run(
+                    ["git", "-C", str(gh_repo_dir), "status", "--porcelain"],
                     capture_output=True,
                     text=True,
                 )
-                if push_proc.returncode == 0:
-                    print("[OK] Pubblicato automaticamente su GitHub Pages: https://mircoantonaci.github.io/acos-treviglio/")
+                if status_proc.stdout.strip():
+                    subprocess.run(["git", "-C", str(gh_repo_dir), "add", "-A"], check=False)
+                    subprocess.run(
+                        ["git", "-C", str(gh_repo_dir), "commit", "-m", "Aggiornamento portale e sorgenti A.C.O.S. Treviglio Calcio 1971"],
+                        check=False,
+                    )
+                    push_proc = subprocess.run(
+                        ["git", "-C", str(gh_repo_dir), "push", "origin", "main"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if push_proc.returncode == 0:
+                        print(f"[OK] Pubblicato automaticamente su GitHub Pages da {gh_repo_dir}: https://mircoantonaci.github.io/acos-treviglio/")
+                    else:
+                        print(f"[INFO] Commit locale pronto in {gh_repo_dir}; esegui git push per aggiornare GitHub Pages.")
                 else:
-                    print(f"[INFO] Commit locale pronto in {gh_repo_dir}; esegui git push per aggiornare GitHub Pages.")
-            else:
-                print(f"[OK] Repository GitHub Pages già allineato in {gh_repo_dir}.")
-            break
+                    print(f"[OK] Repository GitHub Pages già allineato in {gh_repo_dir}.")
+        except PermissionError:
+            continue
 
 
 if __name__ == "__main__":

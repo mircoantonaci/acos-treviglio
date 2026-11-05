@@ -64,6 +64,12 @@ def cmd_deploy(args):
 
     if STANDALONE_HTML.exists():
         shutil.copy2(STANDALONE_HTML, GH_PAGES_DIR / "index.html")
+    if GENERATOR_SCRIPT.exists():
+        shutil.copy2(GENERATOR_SCRIPT, GH_PAGES_DIR / "build_acos_cinematic.py")
+    for fname in ("AGENTS.md", "GEMINI.md", "acos-cli.py"):
+        src_doc = PROJECT_ROOT / fname
+        if src_doc.exists():
+            shutil.copy2(src_doc, GH_PAGES_DIR / fname)
 
     status = subprocess.run(
         ["git", "-C", str(GH_PAGES_DIR), "status", "--porcelain"],
@@ -71,9 +77,9 @@ def cmd_deploy(args):
         text=True,
     )
     if status.stdout.strip():
-        subprocess.run(["git", "-C", str(GH_PAGES_DIR), "add", "index.html"], check=True)
+        subprocess.run(["git", "-C", str(GH_PAGES_DIR), "add", "-A"], check=True)
         subprocess.run(
-            ["git", "-C", str(GH_PAGES_DIR), "commit", "-m", "Aggiornamento portale A.C.O.S. Treviglio Calcio 1971"],
+            ["git", "-C", str(GH_PAGES_DIR), "commit", "-m", "Aggiornamento portale e sorgenti A.C.O.S. Treviglio Calcio 1971"],
             check=True,
         )
 
